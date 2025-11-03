@@ -1,7 +1,7 @@
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from core.config import settings
+from config import settings
 
 def send_email(to: str, subject: str, body: str):
     """Send an email using SMTP"""
