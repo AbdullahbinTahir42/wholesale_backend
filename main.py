@@ -11,7 +11,7 @@ from typing import List, Optional
 from fastapi.middleware.cors import CORSMiddleware
 import models, schemas
 from database import SessionLocal, engine, get_db
-
+from sqlalchemy.orm import joinedload
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -19,7 +19,6 @@ app = FastAPI()
 
 
 origins = [
-    "http://localhost",
     "http://localhost:5173", # Add your React app's URL here
 ]
 
@@ -143,3 +142,67 @@ async def create_product(
     db.refresh(db_product)
 
     return db_product
+
+
+#show all products
+@app.get("/products/", response_model=List[schemas.ProductOut])
+async def read_products(db: Session = Depends(get_db)):
+    """
+    Retrieve all products with their images and pricing tiers.
+    """
+    products = db.query(models.Product).options(
+        joinedload(models.Product.images),
+        joinedload(models.Product.pricing_tiers)
+    ).all()
+    return products
+
+
+
+# --- 🗑️ ADD THIS ENDPOINT TO DELETE A PRODUCT ---
+@app.delete("/products/{product_id}", status_code=204)
+async def delete_product(product_id: int, db: Session = Depends(get_db)):
+    """
+    Delete a product by its ID.
+    """
+    db_product = db.query(models.Product).filter(models.Product.id == product_id).first()
+    
+    if db_product is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+        
+    db.delete(db_product)
+    db.commit()
+    return
+
+
+
+#fetching products
+@app.get("/specific/products/", response_model=List[schemas.ProductOut])
+async def read_specific_products(
+    gender: Optional[str] = None, 
+    category: Optional[str] = None, 
+    db: Session = Depends(get_db)
+):
+    """
+    Retrieve products, optionally filtered by gender and category.
+    Case-insensitive filtering is applied.
+    """
+    print(f"Gender : {gender}" )
+    print(f"Category : {category}" )
+
+    query = db.query(models.Product).options(
+        joinedload(models.Product.images),
+        joinedload(models.Product.pricing_tiers)
+    )
+    
+    if gender:
+        # ilike makes it case-insensitive (Mens matches mens)
+        query = query.filter(models.Product.gender == gender)
+    
+    if category:
+        # Handles cases like 'pants' vs 'pant' if you use simple contains
+        # Or strictly match: query.filter(models.Product.category.ilike(category))
+        query = query.filter(models.Product.category == category)
+
+    products = query.all()
+    return products
