@@ -297,3 +297,19 @@ async def read_customers(db: Session = Depends(get_db)):
         ))
         
     return customers_data
+
+
+@app.put("/orders/{order_id}/status")
+async def update_order_status(order_id: int, status_update: schemas.OrderStatusUpdate, db: Session = Depends(get_db)):
+    """
+    Update the status of a specific order.
+    """
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    order.status = status_update.status
+    db.commit()
+    db.refresh(order)
+    
+    return {"message": "Status updated successfully", "id": order.id, "status": order.status}
