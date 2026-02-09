@@ -313,3 +313,152 @@ async def update_order_status(order_id: int, status_update: schemas.OrderStatusU
     db.refresh(order)
     
     return {"message": "Status updated successfully", "id": order.id, "status": order.status}
+
+
+# ...existing code...
+@app.get("/search/product/{product_name}", response_model=List[schemas.ProductOut])
+def search_product_by_name(product_name: str, db: Session = Depends(get_db), limit: int = 50):
+    """
+    Search for products by name (case-insensitive, partial match).
+    """
+    search_raw = product_name or ""
+    # escape SQL wildcard characters
+    escaped = search_raw.replace("%", "\\%").replace("_", "\\_")
+    search_pattern = f"%{escaped}%"
+
+    products = db.query(models.Product).options(
+        joinedload(models.Product.images),
+        joinedload(models.Product.pricing_tiers)
+    ).filter(
+        cast(models.Product.title, String).ilike(search_pattern, escape='\\')
+    ).limit(limit).all()
+
+    return products
+
+
+# Blog Category Endpoints
+
+@app.post("/blog/categories/", response_model=schemas.BlogCategoryOut)
+def create_blog_category(category: schemas.BlogCategoryCreate, db: Session = Depends(get_db)):
+    # Check if category exists
+    existing = db.query(models.BlogCategory).filter(models.BlogCategory.name == category.name).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Category already exists")
+    
+    db_category = models.BlogCategory(name=category.name)
+    db.add(db_category)
+    db.commit()
+    db.refresh(db_category)
+    return db_category
+
+@app.get("/blog/categories/", response_model=List[schemas.BlogCategoryOut])
+def read_blog_categories(db: Session = Depends(get_db)):
+    return db.query(models.BlogCategory).all()
+
+# ==========================================
+# 📰 BLOG POST ENDPOINTS
+# ==========================================
+
+@app.post("/blog/posts/", response_model=schemas.BlogPostOut)
+def create_blog_post(
+    title: str = Form(...),
+    description: str = Form(...), # Maps to 'excerpt' in model if needed, or description
+    content: str = Form(...),
+    category: str = Form(...),    # Receiving category Name from frontend
+    author: str = Form(...),
+    tags: str = Form(...),
+    is_published: bool = Form(...),
+    image: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    # 1. Handle Category (Find ID by name)
+    # Note: Frontend sends category Name. We find the ID.
+    db_category = db.query(models.BlogCategory).filter(models.BlogCategory.name == category).first()
+    if not db_category:
+        # Auto-create category if it doesn't exist (optional feature)
+        db_category = models.BlogCategory(name=category)
+        db.add(db_category)
+        db.commit()
+        db.refresh(db_category)
+    
+    # 2. Save Image
+    os.makedirs("static/images", exist_ok=True)
+    file_extension = os.path.splitext(image.filename)[1]
+    unique_filename = f"blog_{uuid.uuid4()}{file_extension}"
+    file_path = os.path.join("static/images", unique_filename)
+    
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(image.file, buffer)
+    
+    image_url = f"/static/images/{unique_filename}"
+
+    # 3. Create Post
+    new_post = models.BlogPost(
+        title=title,
+        excerpt=description, # Mapping frontend 'description' to model 'excerpt'
+        author=author,
+        content=content,
+        tags=tags,
+        category_id=db_category.id,
+        image_url=image_url
+        # is_published is not in our previous model, assume all posted are published or add column
+    )
+    db.add(new_post)
+    db.commit()
+    db.refresh(new_post)
+    return new_post
+
+@app.get("/blog/posts/", response_model=List[schemas.BlogPostOut])
+def read_blog_posts(db: Session = Depends(get_db)):
+    return db.query(models.BlogPost).options(joinedload(models.BlogPost.category)).all()
+
+@app.delete("/blog/posts/{post_id}", status_code=204)
+def delete_blog_post(post_id: int, db: Session = Depends(get_db)):
+    post = db.query(models.BlogPost).filter(models.BlogPost.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    db.delete(post)
+    db.commit()
+    return
+
+
+
+@app.post("/products/{product_id}/reviews/", response_model=schemas.ReviewOut)
+def create_review(product_id: int, review: schemas.ReviewCreate, db: Session = Depends(get_db)):
+    """
+    Create a new review for a specific product.
+    """
+    # Verify product exists
+    product = db.query(models.Product).filter(models.Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    db_review = models.Review(
+        product_id=product_id,
+        rating=review.rating,
+        text=review.text,
+        user_name=review.user_name,
+        country=review.country,
+        verified=True 
+    )
+    
+    db.add(db_review)
+    db.commit()
+    db.refresh(db_review)
+    return db_review
+
+@app.get("/products/{product_id}/reviews/", response_model=List[schemas.ReviewOut])
+async def read_reviews(product_id: int, db: Session = Depends(get_db)):
+    """
+    Get all reviews for a specific product, sorted by newest first.
+    """
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database connection failed")
+    
+    reviews = db.query(models.Review)\
+        .filter(models.Review.product_id == product_id)\
+        .order_by(models.Review.created_at.desc())\
+        .all()
+        
+    return reviews

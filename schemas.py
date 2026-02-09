@@ -60,7 +60,27 @@ class ProductOut(ProductBase):
 
     class Config:
         from_attributes = True
+        
 
+class ReviewBase(BaseModel):
+    rating: int
+    text: Optional[str] = None
+    user_name: str = "Anonymous"
+    country: str = "International"
+
+# Schema for creating a review (what the frontend sends)
+class ReviewCreate(ReviewBase):
+    pass
+
+# Schema for reading a review (what the API returns)
+class ReviewOut(ReviewBase):
+    id: int
+    product_id: int
+    created_at: datetime
+    verified: bool
+
+    class Config:
+        from_attributes = True
 
 
 
@@ -151,3 +171,39 @@ class OrderOut(BaseModel):
 
 class OrderStatusUpdate(BaseModel):
     status: str
+
+
+
+class BlogCategoryBase(BaseModel):
+    name: str
+
+class BlogCategoryCreate(BlogCategoryBase):
+    pass
+
+class BlogCategoryOut(BlogCategoryBase):
+    id: int
+    class Config:
+        from_attributes = True
+
+class BlogPostBase(BaseModel):
+    title: str
+    excerpt: str
+    author: str
+    content: str
+    tags: str # User sends "Tag1, Tag2"
+    category_id: int
+
+class BlogPostCreate(BlogPostBase):
+    pass
+
+class BlogPostOut(BlogPostBase):
+    id: int
+    image_url: Optional[str] = None
+    created_at: datetime
+    # We want the category name, not just ID, so we might fetch it or include it nested
+    # For simplicity, we stick to basic fields. Frontend can match ID to Name if needed, 
+    # or we can add a nested category field.
+    category: Optional[BlogCategoryOut] = None
+
+    class Config:
+        from_attributes = True

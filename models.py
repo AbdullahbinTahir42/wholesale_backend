@@ -1,8 +1,9 @@
 # models.py
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, Boolean, DateTime
+from sqlalchemy import Text, Column, Integer, String, Float, ForeignKey, Boolean, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func # Import func for timestamps
 from database import Base
+from datetime import datetime
 
 
 # Product models (Existing)
@@ -20,6 +21,24 @@ class Product(Base):
     # Relationships
     pricing_tiers = relationship("PricingTier", back_populates="product", cascade="all, delete-orphan")
     images = relationship("ProductImage", back_populates="product", cascade="all, delete-orphan")
+    reviews = relationship("Review", back_populates="product", cascade="all, delete-orphan")
+
+
+class Review(Base):
+    __tablename__ = "reviews"
+
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"))
+    
+    rating = Column(Integer)  # 1 to 5
+    text = Column(Text)       # The review content
+    user_name = Column(String, default="Anonymous") # e.g. "Harry"
+    country = Column(String, default="country")
+    verified = Column(Boolean, default=True) # Mocking verified purchase
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    product = relationship("Product", back_populates="reviews")
 
 class PricingTier(Base):
     __tablename__ = "pricing_tiers"
@@ -88,3 +107,27 @@ class OrderItem(Base):
     
     # Back relationship
     order = relationship("Order", back_populates="items")
+
+
+class BlogCategory(Base):
+    __tablename__ = "blog_categories"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
+    
+    posts = relationship("BlogPost", back_populates="category")
+
+class BlogPost(Base):
+    __tablename__ = "blog_posts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, index=True)
+    excerpt = Column(String)
+    author = Column(String, default="Admin")
+    content = Column(Text) # For long markdown text
+    image_url = Column(String)
+    tags = Column(String) # Store as comma-separated string: "Denim,Winter,Style"
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    category_id = Column(Integer, ForeignKey("blog_categories.id"))
+    category = relationship("BlogCategory", back_populates="posts")
