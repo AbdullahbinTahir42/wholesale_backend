@@ -29,11 +29,10 @@ class Review(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     product_id = Column(Integer, ForeignKey("products.id"))
-    
+    email = Column(String)
     rating = Column(Integer)  # 1 to 5
     text = Column(Text)       # The review content
     user_name = Column(String, default="Anonymous") # e.g. "Harry"
-    country = Column(String, default="country")
     verified = Column(Boolean, default=True) # Mocking verified purchase
     
     created_at = Column(DateTime, default=datetime.utcnow)

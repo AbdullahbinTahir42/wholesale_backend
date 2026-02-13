@@ -65,8 +65,9 @@ class ProductOut(ProductBase):
 class ReviewBase(BaseModel):
     rating: int
     text: Optional[str] = None
+    email : EmailStr
     user_name: str = "Anonymous"
-    country: str = "International"
+    # country: str = "International"
 
 # Schema for creating a review (what the frontend sends)
 class ReviewCreate(ReviewBase):

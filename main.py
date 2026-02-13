@@ -439,7 +439,7 @@ def create_review(product_id: int, review: schemas.ReviewCreate, db: Session = D
         rating=review.rating,
         text=review.text,
         user_name=review.user_name,
-        country=review.country,
+        email = review.email,
         verified=True 
     )
     
